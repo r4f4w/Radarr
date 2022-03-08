@@ -8,6 +8,7 @@ using NLog;
 using NzbDrone.Common.EnsureThat;
 using NzbDrone.Core.Exceptions;
 using NzbDrone.Core.MetadataSource;
+using NzbDrone.Core.Movies.Collections;
 using NzbDrone.Core.Organizer;
 using NzbDrone.Core.Parser;
 using NzbDrone.Core.RootFolders;
@@ -24,6 +25,8 @@ namespace NzbDrone.Core.Movies
     {
         private readonly IMovieService _movieService;
         private readonly IMovieMetadataService _movieMetadataService;
+        private readonly IAddMovieCollectionService _collectionService;
+        private readonly IRootFolderService _folderService;
         private readonly IProvideMovieInfo _movieInfo;
         private readonly IBuildFileNames _fileNameBuilder;
         private readonly IAddMovieValidator _addMovieValidator;
@@ -31,6 +34,8 @@ namespace NzbDrone.Core.Movies
 
         public AddMovieService(IMovieService movieService,
                                 IMovieMetadataService movieMetadataService,
+                                IAddMovieCollectionService collectionService,
+                                IRootFolderService folderService,
                                 IProvideMovieInfo movieInfo,
                                 IBuildFileNames fileNameBuilder,
                                 IAddMovieValidator addMovieValidator,
@@ -38,6 +43,8 @@ namespace NzbDrone.Core.Movies
         {
             _movieService = movieService;
             _movieMetadataService = movieMetadataService;
+            _collectionService = collectionService;
+            _folderService = folderService;
             _movieInfo = movieInfo;
             _fileNameBuilder = fileNameBuilder;
             _addMovieValidator = addMovieValidator;
@@ -52,6 +59,13 @@ namespace NzbDrone.Core.Movies
             newMovie = SetPropertiesAndValidate(newMovie);
 
             _logger.Info("Adding Movie {0} Path: [{1}]", newMovie, newMovie.Path);
+
+            // add collection
+            if (newMovie.MovieMetadata.Value.CollectionTmdbId > 0)
+            {
+                var newCollection = _collectionService.AddMovieCollection(BuildCollection(newMovie));
+                newMovie.MovieMetadata.Value.CollectionTmdbId = newCollection.TmdbId;
+            }
 
             _movieMetadataService.Upsert(newMovie.MovieMetadata.Value);
             newMovie.MovieMetadataId = newMovie.MovieMetadata.Value.Id;
@@ -76,6 +90,14 @@ namespace NzbDrone.Core.Movies
                     movie = SetPropertiesAndValidate(movie);
 
                     movie.Added = added;
+
+                    // add collection
+                    if (movie.MovieMetadata.Value.CollectionTmdbId > 0)
+                    {
+                        var newCollection = _collectionService.AddMovieCollection(BuildCollection(movie));
+                        movie.MovieMetadata.Value.CollectionTmdbId = newCollection.TmdbId;
+                    }
+
                     moviesToAdd.Add(movie);
                 }
                 catch (ValidationException ex)
@@ -116,6 +138,28 @@ namespace NzbDrone.Core.Movies
             movie.ApplyChanges(newMovie);
 
             return movie;
+        }
+
+        private MovieCollection BuildCollection(Movie newMovie)
+        {
+            var collection = new MovieCollection
+            {
+                TmdbId = newMovie.MovieMetadata.Value.CollectionTmdbId,
+                Title = newMovie.MovieMetadata.Value.CollectionTitle
+            };
+
+            collection.Monitored = newMovie.AddOptions?.Monitor == MonitorTypes.MovieAndCollection;
+            collection.SearchOnAdd = newMovie.AddOptions?.SearchForMovie ?? false;
+            collection.QualityProfileId = newMovie.ProfileId;
+            collection.MinimumAvailability = newMovie.MinimumAvailability;
+            collection.RootFolderPath = newMovie.RootFolderPath;
+
+            if (newMovie.RootFolderPath == null)
+            {
+                collection.RootFolderPath = _folderService.GetBestRootFolderPath(newMovie.Path);
+            }
+
+            return collection;
         }
 
         private Movie SetPropertiesAndValidate(Movie newMovie)
