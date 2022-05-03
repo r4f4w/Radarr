@@ -26,7 +26,7 @@ namespace NzbDrone.Core.Test.Housekeeping.Housekeepers
         }
 
         [Test]
-        public void should_not_delete_unorphaned_credit_items()
+        public void should_not_delete_unorphaned_collection_items()
         {
             var collection = Builder<MovieCollection>.CreateNew()
                                               .With(h => h.Id = 3)
