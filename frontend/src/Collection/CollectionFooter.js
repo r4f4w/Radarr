@@ -86,7 +86,7 @@ class CollectionFooter extends Component {
     } = this.state;
 
     const monitoredOptions = [
-      { key: NO_CHANGE, value: translate('No Change'), disabled: true },
+      { key: NO_CHANGE, value: translate('NoChange'), disabled: true },
       { key: 'monitored', value: translate('Monitored') },
       { key: 'unmonitored', value: translate('Unmonitored') }
     ];
