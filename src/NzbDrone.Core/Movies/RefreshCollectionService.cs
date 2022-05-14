@@ -132,7 +132,7 @@ namespace NzbDrone.Core.Movies
                     {
                         var newCollection = collection;
 
-                        if (ShouldRefresh(collection))
+                        if (ShouldRefresh(collection) || message.Trigger == CommandTrigger.Manual)
                         {
                             newCollection = RefreshCollectionInfo(collection.Id);
                         }
